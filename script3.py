@@ -1,17 +1,92 @@
 from scapy.all import *
 import binascii
 
-netSSID = 'DIRECT-TEST'       #Network name here
-iface = 'wlan0'         			#Interface name here
-phoneMac='4e:66:41:84:3c:1b'	#mac of the phone
-sourceId = '00:01:02:03:04:05'
-BSSid = sourceId
+IFACE = 'wlan0'
+BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff'
+DIRECT_SSID = 'DIRECT-'
+WIFI_OUI = binascii.unhexlify('506f9a')
+OUI_TYPE = {'P2P': binascii.unhexlify('09'), 'DIRECT': binascii.unhexlify('0a')}
+P2P_ATT = {'CAPABILITY': binascii.unhexlify('02'), 'LISTEN_CHANNEL': binascii.unhexlify('06'), 'DEVICE_INFO': binascii.unhexlify('0d')}
 
-dot11 = Dot11(type=0, subtype=5, addr1=phoneMac, addr2=sourceId, addr3=BSSid)
-probeRes = Dot11ProbeResp()
-essid = Dot11Elt(ID='SSID',info=netSSID, len=len(netSSID))
-direct = Raw(binascii.unhexlify("01088c129824b048606c03010b2a010030140100000fac040100000fac040100000fac0200002d1a6f191bff000000000000000000000080000000000000000000003d160b0f00000000000000000000000000000000000000004a0e14000a00c800c8001400050019007f080500000000000040dd180050f2020101800003a4000027a4000042435e0062322f00dd0900037f01010000ff7fddf50050f204104a0001101044000102103b00010010470010322f0fe1bc5f43fab1b3836940e2b2bd102100094d6963726f736f667410230007583430365541521024000a31302e302e323230303010420001301054000800070050f20000001011000f4141414141412d3537413331414a4a1008000200081049000600372a0001201049001700013710060010081214cb6be446da8fc2f20dcdcf4d811049005500013720010001272002000f4141414141412d3537413331414a4a2005000c3139322e3136382e312e313120050026326130303a613034303a3139363a333533303a383161643a656531353a356431663a66616330dd0d506f9a0a00000600111c440006dd30506f9a0902020025a90d240082c5f27aa0a3000800070050f2000000001011000f4141414141412d3537413331414a4a"))
-frame = RadioTap()/dot11/probeRes/essid/direct
+def binary_str_to_bytes(s):
+    return bytes(int(s[i : i + 8], 2) for i in range(0, len(s), 8))
 
-sendp(frame, iface=iface, loop=1)
+def probe_req_frame(source_mac):
+    # basic headers
+    frame = RadioTap()/Dot11(addr1=BROADCAST_MAC, addr2=source_mac, addr3=BROADCAST_MAC)/Dot11ProbeReq()
+    frame /= Dot11Elt(ID='SSID', info=DIRECT_SSID, len=len(DIRECT_SSID))
+    frame /= Dot11EltRates(rates=[0x8c, 0x12, 0x98, 0x24, 0xb0, 0x48, 0x60, 0x6c])
+    
+    # P2P Information Element
+    p2p_info = WIFI_OUI + OUI_TYPE['P2P']
 
+    # Capabilities
+    # from right to left: Service Discovery, P2P Client Discoverability, Concurrect Operation, 
+    # P2P Infrastructure Managed, P2P Device Limit, P2P Invitation Procedure
+    device_capability_bitmap = binary_str_to_bytes('00000001')
+    # from right to left: P2P Group Owner, Persistent P2P Group, P2P Group Limit, Intra-BSS Distribution,
+    # Cross Connection, Persistent Reconnect, Group Formation, IP Address Allocation
+    group_capability_bitmap = binary_str_to_bytes('00000000')
+    capability_att_len = (len(device_capability_bitmap) + len(group_capability_bitmap)).to_bytes(2, byteorder='little')
+    p2p_info += P2P_ATT['CAPABILITY'] + capability_att_len + device_capability_bitmap + group_capability_bitmap
+
+    # Listen Channel
+    country_string = bytes('IL', encoding='utf8') + binascii.unhexlify('04')
+    operating_class = (81).to_bytes(1)
+    channel_number = binascii.unhexlify('01')
+    listen_channel_att_len = (len(country_string) + len(operating_class) + len(channel_number)).to_bytes(2, byteorder='little')
+    p2p_info += P2P_ATT['LISTEN_CHANNEL'] + listen_channel_att_len + country_string + operating_class + channel_number
+
+    frame /= Dot11Elt(ID=221, info=RawVal(p2p_info), len=len(p2p_info))
+
+    return frame
+    
+def probe_res_frame(dest_mac):    
+    ssid = 'DIRECT-TEST' 
+    source_mac = '00:01:02:03:04:05'
+
+    # basic headers
+    frame = RadioTap()/Dot11(addr1=dest_mac, addr2=source_mac, addr3=source_mac)/Dot11ProbeResp()
+    frame /= Dot11Elt(ID='SSID', info=ssid, len=len(ssid))
+    frame /= Dot11EltRates(rates=[0x8c, 0x12, 0x98, 0x24, 0xb0, 0x48, 0x60, 0x6c])
+
+    # P2P Information Element
+    p2p_info = WIFI_OUI + OUI_TYPE['P2P']
+
+    # Capabilities
+    # from right to left: Service Discovery, P2P Client Discoverability, Concurrect Operation, 
+    # P2P Infrastructure Managed, P2P Device Limit, P2P Invitation Procedure
+    device_capability_bitmap = binary_str_to_bytes('00000001')
+    # from right to left: P2P Group Owner, Persistent P2P Group, P2P Group Limit, Intra-BSS Distribution,
+    # Cross Connection, Persistent Reconnect, Group Formation, IP Address Allocation
+    group_capability_bitmap = binary_str_to_bytes('00000000')
+    capability_att_len = (len(device_capability_bitmap) + len(group_capability_bitmap)).to_bytes(2, byteorder='little')
+    p2p_info += P2P_ATT['CAPABILITY'] + capability_att_len + device_capability_bitmap + group_capability_bitmap
+    
+    # Device Info
+    p2p_device_addr = binascii.unhexlify('060708090a0b')   # actually can be the same as source addr
+    # from right to left: Flash, Ethernet, Label, Display, External NFC, Integrated NFC, NFC Interface,
+    # PushButton, Keypad
+    config_methods = binary_str_to_bytes('0000000000001000')
+    primary_device_type_category = binascii.unhexlify('0007')
+    primary_device_type_oui = binascii.unhexlify('0050f200')
+    primary_device_type_subcategory = binascii.unhexlify('0000')
+    number_of_secondary_device_types = binascii.unhexlify('00')
+    device_name_att_type = binascii.unhexlify('1011')
+    device_name = bytes(ssid, encoding='utf8')
+    device_name_len = (len(device_name)).to_bytes(2, byteorder='big')
+
+    device_info = p2p_device_addr + config_methods + primary_device_type_category 
+    device_info += primary_device_type_oui + primary_device_type_subcategory + number_of_secondary_device_types
+    device_info += device_name_att_type + device_name_len + device_name
+    device_info_att_len = (len(device_info)).to_bytes(2, byteorder='little')
+    p2p_info += P2P_ATT['DEVICE_INFO'] + device_info_att_len + device_info
+
+    frame /= Dot11Elt(ID=221, info=RawVal(p2p_info), len=len(p2p_info))
+
+    return frame
+
+phoneMac='4e:66:41:84:3c:1b'
+frame = probe_res_frame(phoneMac)
+# wireshark(frame)
+sendp(frame, iface=IFACE, inter=0.1, loop=1)
