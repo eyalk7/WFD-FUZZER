@@ -19,6 +19,10 @@ def get_specific_dot11elt(pkt, id):
 	return dot11elt #might return None if layer doesn't exist. Do we want to handle it?
 		
 
+#filter and callback func a bit messy.
+#need to decide our goal and refactor accordingly
+
+
 def packet_filter(pkt):
 	if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeReq):
 		ssid = str(pkt.getlayer(Dot11Elt).info)
@@ -42,9 +46,9 @@ def send_probe_response(pkt):
 		sendp(frame, iface=IFACE)
 
 		
-def scan(pkt_filter, **kwargs):
+def scan(pkt_filter, callback, **kwargs):
 	print("start scan")
-	pkts = sniff(iface=IFACE, lfilter=pkt_filter, **kwargs)
+	pkts = sniff(iface=IFACE, prn=callback, lfilter=pkt_filter, **kwargs)
 	print("scan completed")
 	return pkts
 
