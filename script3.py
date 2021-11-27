@@ -7,6 +7,8 @@ DIRECT_SSID = 'DIRECT-'
 WIFI_OUI = binascii.unhexlify('506f9a')
 OUI_TYPE = {'P2P': binascii.unhexlify('09'), 'DIRECT': binascii.unhexlify('0a')}
 P2P_ATT = {'CAPABILITY': binascii.unhexlify('02'), 'LISTEN_CHANNEL': binascii.unhexlify('06'), 'DEVICE_INFO': binascii.unhexlify('0d')}
+PHONE_MAC='4e:66:41:84:3c:1b'
+
 
 def binary_str_to_bytes(s):
     return bytes(int(s[i : i + 8], 2) for i in range(0, len(s), 8))
@@ -86,7 +88,7 @@ def probe_res_frame(dest_mac):
 
     return frame
 
-phoneMac='4e:66:41:84:3c:1b'
-frame = probe_res_frame(phoneMac)
-# wireshark(frame)
-sendp(frame, iface=IFACE, inter=0.1, loop=1)
+if __name__ == "__main__":
+	frame = probe_res_frame(PHONE_MAC)
+	# wireshark(frame)
+	sendp(frame, iface=IFACE, inter=0.1, loop=1)

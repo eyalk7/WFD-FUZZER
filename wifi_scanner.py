@@ -1,26 +1,51 @@
 from scapy.all import *
+from script3 import probe_res_frame
 
-iface="wlx00c0caabd843"
+IFACE = "wlx00c0caabd843"
+nearby_devices = dict()
 
-unique_devices = set()
+class Device():
+	def __init__(self, ssid, bssid, src_mac, is_ap):
+		self.ssid = ssid
+		self.bssid = bssid
+		self.src_mac = src_mac
+		self.is_ap = is_ap
+		
+		
+def get_specific_dot11elt(pkt, id):
+	dot11elt = pkt.getlayer(Dot11Elt)
+	while dot11elt and dot11elt.ID != id:
+		dot11elt = dot11elt.payload.getlayer(Dot11Elt)
+	return dot11elt #might return None if layer doesn't exist. Do we want to handle it?
+		
 
-
-def expand(pkt):
-#returns a generator. use list(expand(pkt)) or for p in expand(pkt)
-    yield type(pkt)
-    while pkt.payload:
-        pkt = pkt.payload
-        yield type(pkt)
-
-def packet_handler(pkt):
-	if pkt.haslayer(Dot11Beacon):
+def packet_filter(pkt):
+	if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeReq):
+		ssid = str(pkt.getlayer(Dot11Elt).info)
+		#if "DIRECT" in ssid
 		dot11_layer = pkt.getlayer(Dot11)
-		if dot11_layer.addr2 and (dot11_layer.addr2 not in unique_devices):
-			essid = essid = pkt.getlayer(Dot11Elt).info
-			unique_devices.add((dot11_layer.addr2, essid))
+		bssid = dot11_layer.addr3
+		src_mac = dot11_layer.addr2
+		is_ap = False if pkt.haslayer(Dot11ProbeReq) else True
+		device = Device(ssid, bssid, src_mac, is_ap)
+		print(ssid, bssid, src_mac, is_ap)
+		if device.src_mac not in nearby_devices:
+			nearby_devices[device.src_mac] = device
+		return True
+	return False
 
-print("start sniff")
-sniff(iface=iface, count=1000, prn=packet_handler)
-print("end sniff, devices found:")
-print(unique_devices)
+def send_probe_response(pkt):
+	if pkt.haslayer(Dot11ProbeReq):
+		dot11_layer = pkt.getlayer(Dot11)
+		src_mac = dot11_layer.addr2
+		frame = probe_res_frame(src_mac)
+		sendp(frame, iface=IFACE)
+
+		
+def scan(pkt_filter, **kwargs):
+	print("start scan")
+	pkts = sniff(iface=IFACE, lfilter=pkt_filter, **kwargs)
+	print("scan completed")
+	return pkts
+
 			
