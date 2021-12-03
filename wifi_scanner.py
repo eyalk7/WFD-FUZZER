@@ -1,5 +1,5 @@
 from scapy.all import *
-from script3 import probe_res_frame
+from fuzzer import probe_res_frame
 
 IFACE = "wlx00c0caabd843"
 nearby_devices = dict()
