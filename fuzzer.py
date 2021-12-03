@@ -32,19 +32,27 @@ def wifi_direct_capabilities_att(device_capability, group_capability):
 
     content = device_capability_bitmap + group_capability_bitmap
 
-    return DIRECT_ATT["CAPABILITY"] + len(content).to_bytes(2, byteorder="little") + content
+    return (
+        DIRECT_ATT["CAPABILITY"]
+        + len(content).to_bytes(2, byteorder="little")
+        + content
+    )
 
 
 def wifi_direct_listen_channel_att():
     country_string = bytes("IL", encoding="utf8") + unhexlify("04")
 
-    operating_class = (81).to_bytes(1)
+    operating_class = (81).to_bytes(1, byteorder="little")
 
     channel_number = unhexlify("01")
 
     content = country_string + operating_class + channel_number
 
-    return DIRECT_ATT["LISTEN_CHANNEL"] + len(content).to_bytes(2, byteorder="little") + content
+    return (
+        DIRECT_ATT["LISTEN_CHANNEL"]
+        + len(content).to_bytes(2, byteorder="little")
+        + content
+    )
 
 
 def wifi_direct_device_info_att(ssid):
@@ -66,7 +74,7 @@ def wifi_direct_device_info_att(ssid):
     device_name_att_type = unhexlify("1011")
 
     device_name = bytes(ssid, encoding="utf8")
-    
+
     device_name_len = (len(device_name)).to_bytes(2, byteorder="big")
 
     content = p2p_device_addr + config_methods + primary_device_type_category
@@ -74,22 +82,32 @@ def wifi_direct_device_info_att(ssid):
     content += number_of_secondary_device_types + device_name_att_type
     content += device_name_len + device_name
 
-    return DIRECT_ATT["DEVICE_INFO"] + len(content).to_bytes(2, byteorder="little") + content
+    return (
+        DIRECT_ATT["DEVICE_INFO"]
+        + len(content).to_bytes(2, byteorder="little")
+        + content
+    )
 
 
 # from the captures we got, this is the structure of P2P IEs sent by the source (the phone)
 def wifi_direct_ie_src():
     header = wifi_direct_ie_header()
 
-    content = wifi_direct_capabilities_att("00100101", "00000000") + wifi_direct_listen_channel_att()
+    content = (
+        wifi_direct_capabilities_att("00100101", "00000000")
+        + wifi_direct_listen_channel_att()
+    )
 
     return header + content
+
 
 # from the captures we got, this is the structure of P2P IEs sent by the sink (the computer)
 def wifi_direct_ie_sink(ssid):
     header = wifi_direct_ie_header()
 
-    content = wifi_direct_capabilities_att("00100101", "00101011") + wifi_direct_device_info_att(ssid)
+    content = wifi_direct_capabilities_att(
+        "00100101", "00101011"
+    ) + wifi_direct_device_info_att(ssid)
 
     return header + content
 
@@ -150,19 +168,25 @@ def probe_req_frame(source_mac):
     frame /= Dot11Elt(ID="SSID", info=DIRECT_SSID, len=len(DIRECT_SSID))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
 
+    display_ie = wifi_display_ie()
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
+
     direct_ie = wifi_direct_ie_src()
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
     return frame
 
 
-def probe_res_frame(dest_mac, source_mac = "00:01:02:03:04:05", ssid = "DIRECT-TEST"):
+def probe_res_frame(dest_mac, source_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(addr1=dest_mac, addr2=source_mac, addr3=source_mac)
     frame /= Dot11ProbeResp()
     frame /= Dot11Elt(ID="SSID", info=ssid, len=len(ssid))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+
+    display_ie = wifi_display_ie()
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
 
     direct_ie = wifi_direct_ie_sink(ssid)
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
@@ -172,7 +196,7 @@ def probe_res_frame(dest_mac, source_mac = "00:01:02:03:04:05", ssid = "DIRECT-T
 
 if __name__ == "__main__":
     phone_mac = "00:00:00:00:00:00"
-    iface = ''
+    iface = ""
 
     frame = probe_res_frame(phone_mac)
     # wireshark(frame)
