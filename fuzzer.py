@@ -11,6 +11,7 @@ DIRECT_ATT = {
     "DEVICE_INFO": unhexlify("0d"),
 }
 DISPLAY_SE = {"DEVICE_INFO": unhexlify("00")}
+IFACE = "wlx00c0caabd843"
 
 
 def binary_str_to_bytes(s):
@@ -192,12 +193,26 @@ def probe_res_frame(dest_mac, source_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
     return frame
+def probe_req_loop(src_mac):
+	probe_response = None
+	frame = probe_req_frame(src_mac)
+	while not probe_response:
+		ans, unans = srp(frame, iface=IFACE, inter=0.1, timeout=0.1)
+		if ans:
+			probe_response = ans[0][1] #list of answers. each answer is a tuple
+	return probe_response
 
+def create_auth_req(src_mac, dst_mac):
+	auth_frame = Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+	auth_frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
+	return auth_frame
 
 if __name__ == "__main__":
-    phone_mac = "00:00:00:00:00:00"
-    iface = ""
-
-    frame = probe_res_frame(phone_mac)
-    # wireshark(frame)
-    sendp(frame, iface=iface, inter=0.1, loop=1)
+	phone_mac = "00:00:00:00:00:01"
+	iface = "wlx00c0caabd843"
+	probe_response = None
+	frame = probe_req_frame(phone_mac)
+	while not probe_response:
+		ans, unans = srp(frame, iface=IFACE, inter=0.1, timeout=0.1)
+		if ans:
+			probe_response = ans[0][1]
