@@ -179,9 +179,18 @@ def create_probe_req(source_mac):
 
 
 def create_auth_req(src_mac, dst_mac):
-		auth_frame = RadioTap()/Dot11(addr1=dst_mac, addr2=self.src_mac, addr3=dst_mac)
-		auth_frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
-		return auth_frame
+	frame = RadioTap()/Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+	frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
+	return frame
+
+def create_asso_req(src_mac, dst_mac, ssid):
+	#todo: probably need to add WFD specific headers.
+	frame = RadioTap()
+	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+	frame /= Dot11AssoReq(cap=0x1100, listen_interval=0x00a) 
+	frame /= Dot11Elt(ID=0, info=ssid)
+	frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+	return frame
 	
 def create_probe_res(dest_mac, source_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
