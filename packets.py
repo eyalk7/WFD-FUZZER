@@ -11,11 +11,14 @@ DIRECT_ATT = {
     "DEVICE_INFO": unhexlify("0d"),
 }
 DISPLAY_SE = {"DEVICE_INFO": unhexlify("00")}
-IFACE = "wlx00c0caabd843"
 
 
 def binary_str_to_bytes(s):
     return bytes(int(s[i : i + 8], 2) for i in range(0, len(s), 8))
+
+def mac_addr_to_hex(addr):
+    del addr[::3]
+    return ''.join(addr) 
 
 
 def wifi_direct_ie_header():
@@ -56,25 +59,35 @@ def wifi_direct_listen_channel_att():
     )
 
 
-def wifi_direct_device_info_att(ssid):
-    # can be the same as source addr
-    p2p_device_addr = unhexlify("060708090a0b")
+def wifi_direct_device_info_att(dev_addr, methods, dev_cat, dev_oui, dev_subcat, num_sec_dev_types, dev_name_type, dev_name):
+    # MAC address.
+    # can be the same as source addr or different (Wifi Direct gives
+    # option for one device to open number of connections, each connection 
+    # will have to get unique MAC addr)
+    p2p_device_addr = unhexlify(mac_addr_to_hex(dev_addr))
 
+    # 16 bits binary string.
     # from right to left: Flash, Ethernet, Label, Display, External NFC, Integrated NFC, NFC Interface,
     # PushButton, Keypad
-    config_methods = binary_str_to_bytes("0000000000001000")
+    config_methods = binary_str_to_bytes(methods)
 
-    primary_device_type_category = unhexlify("0007")
+    # 2 bytes hex string
+    primary_device_type_category = unhexlify(dev_cat)
 
-    primary_device_type_oui = unhexlify("0050f200")
+    # 4 bytes hex string
+    primary_device_type_oui = unhexlify(dev_oui)
 
-    primary_device_type_subcategory = unhexlify("0000")
+    # 2 bytes hex string
+    primary_device_type_subcategory = unhexlify(dev_subcat)
 
-    number_of_secondary_device_types = unhexlify("00")
+    # One byte hex string
+    number_of_secondary_device_types = unhexlify(num_sec_dev_types)
 
-    device_name_att_type = unhexlify("1011")
+    # 2 bytes hex string
+    device_name_att_type = unhexlify(dev_name_type)
 
-    device_name = bytes(ssid, encoding="utf8")
+    # string
+    device_name = bytes(dev_name, encoding="utf8")
 
     device_name_len = (len(device_name)).to_bytes(2, byteorder="big")
 
@@ -88,29 +101,6 @@ def wifi_direct_device_info_att(ssid):
         + len(content).to_bytes(2, byteorder="little")
         + content
     )
-
-
-# from the captures we got, this is the structure of P2P IEs sent by the source (the phone)
-def wifi_direct_ie_src():
-    header = wifi_direct_ie_header()
-
-    content = (
-        wifi_direct_capabilities_att("00100101", "00000000")
-        + wifi_direct_listen_channel_att()
-    )
-
-    return header + content
-
-
-# from the captures we got, this is the structure of P2P IEs sent by the sink (the computer)
-def wifi_direct_ie_sink(ssid):
-    header = wifi_direct_ie_header()
-
-    content = wifi_direct_capabilities_att(
-        "00100101", "00101011"
-    ) + wifi_direct_device_info_att(ssid)
-
-    return header + content
 
 
 def wifi_display_ie_header():
@@ -153,10 +143,10 @@ def wifi_display_device_info_se(flags, port, throughput):
 
 # all of the WFD IEs in the captures we got contains only the wifi display device info subelement.
 # potentially it could contain more / other subelements.
-def wifi_display_ie():
+def wifi_display_ie(flags, port, throughput):
     header = wifi_display_ie_header()
 
-    content = wifi_display_device_info_se("0000000000000000", 7236, 3)
+    content = wifi_display_device_info_se(flags, port, throughput)
 
     return header + content
 
@@ -169,10 +159,15 @@ def create_probe_req(source_mac):
     frame /= Dot11Elt(ID="SSID", info=DIRECT_SSID, len=len(DIRECT_SSID))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
 
-    display_ie = wifi_display_ie()
+    display_ie = wifi_display_ie("0000000100010000", 7236, 50)
     frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
 
-    direct_ie = wifi_direct_ie_src()
+    direct_ie_header = wifi_direct_ie_header()
+    direct_ie_content = (
+        wifi_direct_capabilities_att("00100101", "00000000")
+        + wifi_direct_listen_channel_att()
+    )
+    direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
     return frame
@@ -184,15 +179,26 @@ def create_auth_req(src_mac, dst_mac):
 	return frame
 
 def create_asso_req(src_mac, dst_mac, ssid):
-	#todo: probably need to add WFD specific headers.
 	frame = RadioTap()
 	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
 	frame /= Dot11AssoReq(cap=0x1100, listen_interval=0x00a) 
 	frame /= Dot11Elt(ID=0, info=ssid)
 	frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+
+    display_ie = wifi_display_ie("0000000100010000", 7236, 50)
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
+
+    direct_ie_header = wifi_direct_ie_header()
+    direct_ie_content = (
+        wifi_direct_capabilities_att("00100111", "00000000")
+        + wifi_direct_device_info_att(src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "Fuzzer")
+    )
+    direct_ie = direct_ie_header + direct_ie_content
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
+
 	return frame
 	
-def create_probe_res(dest_mac, source_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
+def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(addr1=dest_mac, addr2=source_mac, addr3=source_mac)
@@ -203,7 +209,11 @@ def create_probe_res(dest_mac, source_mac="00:01:02:03:04:05", ssid="DIRECT-TEST
     display_ie = wifi_display_ie()
     frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
 
-    direct_ie = wifi_direct_ie_sink(ssid)
+    direct_ie_header = wifi_direct_ie_header()
+    direct_ie_content = wifi_direct_capabilities_att(
+        "00100101", "00101011"
+    ) +  wifi_direct_device_info_att(src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", ssid)
+    direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
     return frame

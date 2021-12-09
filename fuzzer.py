@@ -5,7 +5,7 @@ from packets import *
 
 
 PHONE_MAC = "00:00:00:00:00:01"
-IFACE = "wlx00c0caabd843"
+IFACE = "wlan0"
 
 
 class Fuzzer():
