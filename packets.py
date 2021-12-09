@@ -4,22 +4,37 @@ from binascii import unhexlify
 BROADCAST_MAC = "ff:ff:ff:ff:ff:ff"
 DIRECT_SSID = "DIRECT-"
 WIFI_OUI = unhexlify("506f9a")
-OUI_TYPE = {"DIRECT": unhexlify("09"), "DISPLAY": unhexlify("0a")}
+WPS_OUI = unhexlify("0050f2")
+OUI_TYPE = {"DIRECT": unhexlify("09"), "DISPLAY": unhexlify("0a"), "WPS": unhexlify("04")}
 DIRECT_ATT = {
     "CAPABILITY": unhexlify("02"),
     "LISTEN_CHANNEL": unhexlify("06"),
     "DEVICE_INFO": unhexlify("0d"),
 }
 DISPLAY_SE = {"DEVICE_INFO": unhexlify("00")}
+WPS_ATT = {
+    "VERSION": unhexlify("104a"),
+    "REQUEST_TYPE": unhexlify("103a"),
+    "CONFIG_METHODS": unhexlify("1008"),
+    "UUID_E": unhexlify("1047"),
+    "DEV_TYPE": unhexlify("1054"),
+    "RF_BANDS": unhexlify("103c"),
+    "ASSOC_STATE": unhexlify("1002"),
+    "CONF_ERROR": unhexlify("1009"),
+    "PASS_ID": unhexlify("1012"),
+    "MANUFACTURER": unhexlify("1021"),
+    "MODEL_NAME": unhexlify("1023"),
+    "MODEL_NUM": unhexlify("1024"),
+    "DEV_NAME": unhexlify("1011"),
+    "VERSION_2": unhexlify("1049")
+}
 
 
 def binary_str_to_bytes(s):
     return bytes(int(s[i : i + 8], 2) for i in range(0, len(s), 8))
 
 def mac_addr_to_hex(addr):
-    del addr[::3]
-    return ''.join(addr) 
-
+    return ''.join([c if (i+1) % 3 else '' for i, c in enumerate(addr)])
 
 def wifi_direct_ie_header():
     return WIFI_OUI + OUI_TYPE["DIRECT"]
@@ -150,6 +165,59 @@ def wifi_display_ie(flags, port, throughput):
 
     return header + content
 
+def wps_req_ie(config_methods, uuid_e, dev_type, manufacturer, model_name, model_num, dev_name):
+    header = WPS_OUI + OUI_TYPE["WPS"]
+
+    # Deprecated. Always set to 0x10 for backwards compatibility
+    version_att = WPS_ATT["VERSION"] + unhexlify("000110")
+
+    req_type_att = WPS_ATT["REQUEST_TYPE"] + unhexlify("000101")
+
+    # from right to left - USB, Ethernet, Label, Display, External NFC, Internal NFC
+    # NFC Interface, Push Button, Keypad, Virtual Push Button, Physical Push Button
+    # null, null, Virtual Display, Physical Display, null
+    bin_config_methods = binary_str_to_bytes(config_methods)
+    config_methods_att = WPS_ATT["CONFIG_METHODS"] + len(bin_config_methods).to_bytes(2, byteorder='big') + bin_config_methods
+
+    bin_uuid_e = unhexlify(uuid_e)
+    uuid_e_att = WPS_ATT["UUID_E"] + len(bin_uuid_e).to_bytes(2, byteorder='big') + bin_uuid_e
+
+    bin_dev_type = unhexlify(dev_type)
+    dev_type_att = WPS_ATT["DEV_TYPE"] + len(bin_dev_type).to_bytes(2, byteorder='big') + bin_dev_type
+
+    # 2.4 or 5 GHz
+    rf_bands_att = WPS_ATT["RF_BANDS"] + unhexlify("000103")
+
+    # not associated
+    assoc_state_att = WPS_ATT["ASSOC_STATE"] + unhexlify("00020000")
+
+    # no error
+    conf_error_att = WPS_ATT["CONF_ERROR"] + unhexlify("00020000")
+
+    # PIN
+    pass_id_att = WPS_ATT["PASS_ID"] + unhexlify("00020000")
+
+    bin_manufacturer = bytes(manufacturer, encoding="utf8")
+    manufacturer_att = WPS_ATT["MANUFACTURER"] + len(bin_manufacturer).to_bytes(2, byteorder='big') + bin_manufacturer
+
+    bin_model_name = bytes(model_name, encoding="utf8")
+    model_name_att = WPS_ATT["MODEL_NAME"] + len(bin_model_name).to_bytes(2, byteorder='big') + bin_model_name
+
+    bin_model_num = bytes(model_num, encoding="utf8")
+    model_num_att = WPS_ATT["MODEL_NUM"] + len(bin_model_num).to_bytes(2, byteorder='big') + bin_model_num
+
+    bin_dev_name = bytes(dev_name, encoding="utf8")
+    dev_name_att = WPS_ATT["DEV_NAME"] + len(bin_dev_name).to_bytes(2, byteorder='big') + bin_dev_name
+
+    # version 2 request to enroll
+    ver_2_att = WPS_ATT["VERSION_2"] + unhexlify("000600372a000120")
+
+    content = version_att + req_type_att + config_methods_att + uuid_e_att + dev_type_att
+    content += rf_bands_att + assoc_state_att + conf_error_att + pass_id_att
+    content += manufacturer_att + model_name_att + model_num_att + dev_name_att + ver_2_att
+
+    return header + content
+
 
 def create_probe_req(source_mac):
     # basic headers
@@ -158,6 +226,9 @@ def create_probe_req(source_mac):
     frame /= Dot11ProbeReq()
     frame /= Dot11Elt(ID="SSID", info=DIRECT_SSID, len=len(DIRECT_SSID))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+
+    wps_ie = wps_req_ie("0010000101001000", "12d78e1bef9359df8437b8dec4e0c31f", "0000000000000000", " ", " ", " ", " ")
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=len(wps_ie))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
     frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
@@ -179,11 +250,13 @@ def create_auth_req(src_mac, dst_mac):
 	return frame
 
 def create_asso_req(src_mac, dst_mac, ssid):
-	frame = RadioTap()
-	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
-	frame /= Dot11AssoReq(cap=0x1100, listen_interval=0x00a) 
-	frame /= Dot11Elt(ID=0, info=ssid)
-	frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+    frame = RadioTap()
+    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+    frame /= Dot11AssoReq(cap=0x1100, listen_interval=0x00a) 
+    frame /= Dot11Elt(ID=0, info=ssid)
+    frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
+    frame /= Dot11Elt(ID=36, info=RawVal(unhexlify("010d")), len=2)
+    frame /= Dot11EltRSN()
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
     frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
@@ -196,7 +269,8 @@ def create_asso_req(src_mac, dst_mac, ssid):
     direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
-	return frame
+    return frame
+    
 	
 def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
