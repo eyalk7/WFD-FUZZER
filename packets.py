@@ -410,7 +410,7 @@ def create_asso_req(src_mac, dst_mac, ssid):
 def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
     frame = RadioTap()
-    frame /= Dot11(addr1=dest_mac, addr2=source_mac, addr3=source_mac)
+    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=src_mac)
     frame /= Dot11ProbeResp()
     frame /= Dot11Elt(ID="SSID", info=ssid, len=len(ssid))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
@@ -429,6 +429,26 @@ def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
 
     return frame
 
+def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
+	frame = RadioTap()
+	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=src_mac, type=0x2, subtype=0x8)
+	frame /= Dot11QoS()
+	frame /= LLC(dsap=0xaa, ssap=0xaa, ctrl=3)
+	frame /= SNAP(OUI=0x0, code=0x888e)
+	
+	if phase == "start":
+		frame /= EAPOL(version=0x1, type=0x1)
+	else:
+		frame /= EAPOL(version=0x1, type=0x0)
+		if phase == "id":
+			eap = EAP(code=0x2, id=id, type=0x1, identity="WFA-SimpleConfig-Enrollee-1-0")
+			eap.len = len(eap)
+			frame /= eap
+		elif phase == "m1":
+			pass
+	
+	return frame 
+	
 
 def get_device_p2p_addr(packet):
 		ie = packet[Dot11EltVendorSpecific]
