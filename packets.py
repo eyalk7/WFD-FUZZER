@@ -30,6 +30,7 @@ WPS_ATT = {
     "MODEL_NUM": unhexlify("1024"),
     "DEV_NAME": unhexlify("1011"),
     "VERSION_2": unhexlify("1049"),
+    "RESPONSE_TYPE": unhexlify("103b")
 }
 
 
@@ -319,7 +320,7 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id):
         wps_manufacturer_att("Technion") +
         wps_model_name_att("CS") +
         wps_model_num_att("2022") +
-        wps_dev_name_att("Fuzzer")+
+        wps_dev_name_att("FUZZER")+
         wps_ver_2_att()
     )
     wps_ie = wps_ie_header + wps_ie_content
@@ -350,7 +351,7 @@ def create_prov_disc_req(src_mac, dst_mac):
     direct_ie_content = wifi_direct_capabilities_att(
         "00100101", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "Fuzzer"
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "FUZZER"
     )
     direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
@@ -377,11 +378,10 @@ def create_auth_req(src_mac, dst_mac):
 def create_asso_req(src_mac, dst_mac, ssid):
     frame = RadioTap()
     frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
-    frame /= Dot11AssoReq(cap=0x1100, listen_interval=0x00A)
+    frame /= Dot11AssoReq(cap=0x3104, listen_interval=0x00A)
     frame /= Dot11Elt(ID=0, info=ssid)
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
     frame /= Dot11Elt(ID=36, info=RawVal(unhexlify("010d")), len=2)
-    frame /= Dot11EltRSN()
 
     wps_ie_header = wifi_wps_ie_header()
     wps_ie_content = (
@@ -399,13 +399,43 @@ def create_asso_req(src_mac, dst_mac, ssid):
     direct_ie_content = wifi_direct_capabilities_att(
         "00100111", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "Fuzzer"
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "FUZZER"
     )
     direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
 
     return frame
 
+def create_block_ack_req(src_mac, dst_mac):
+    # basic headers
+    frame = RadioTap()
+    frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+
+    # fixed parameters
+    frame /= Raw(unhexlify("0300d5031000000000"))
+
+    return frame
+
+def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
+	frame = RadioTap()
+	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac, type=0x2, subtype=0x8, FCfield=0x1)
+	frame /= Dot11QoS()
+	frame /= LLC(dsap=0xaa, ssap=0xaa, ctrl=3)
+	frame /= SNAP(OUI=0x0, code=0x888e)
+	
+	if phase == "start":
+		frame /= EAPOL(version=0x1, type=0x1)
+	else:
+		frame /= EAPOL(version=0x1, type=0x0)
+		if phase == "id":
+			eap = EAP(code=0x2, id=id, type=0x1, identity="WFA-SimpleConfig-Enrollee-1-0")
+			eap.len = len(eap)
+			frame /= eap
+		elif phase == "m1":
+			pass
+	
+	return frame 
+	
 
 def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
     # basic headers
@@ -429,33 +459,30 @@ def create_probe_res(dst_mac, src_mac="00:01:02:03:04:05", ssid="DIRECT-TEST"):
 
     return frame
 
-def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
-	frame = RadioTap()
-	frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=src_mac, type=0x2, subtype=0x8)
-	frame /= Dot11QoS()
-	frame /= LLC(dsap=0xaa, ssap=0xaa, ctrl=3)
-	frame /= SNAP(OUI=0x0, code=0x888e)
-	
-	if phase == "start":
-		frame /= EAPOL(version=0x1, type=0x1)
-	else:
-		frame /= EAPOL(version=0x1, type=0x0)
-		if phase == "id":
-			eap = EAP(code=0x2, id=id, type=0x1, identity="WFA-SimpleConfig-Enrollee-1-0")
-			eap.len = len(eap)
-			frame /= eap
-		elif phase == "m1":
-			pass
-	
-	return frame 
-	
 
 def get_device_p2p_addr(packet):
-		ie = packet[Dot11EltVendorSpecific]
-		while isinstance(ie, Dot11EltVendorSpecific):
-				if ie.info[:3] == WIFI_OUI and ie.info[3] == 9: 
-						# assuming the direct ie contains only capabilities and device info attributes (in this order)
-						return ie.info[12:18]
-				ie = ie.payload
+    ie = packet[Dot11EltVendorSpecific]
+    while isinstance(ie, Dot11EltVendorSpecific):        
+        if ie.info[:3] == WIFI_OUI and ie.info[3] == int.from_bytes(OUI_TYPE["DIRECT"], byteorder='big'):             
+            i = 4
+            while i < len(ie.info):
+                if ie.info[i] == int.from_bytes(DIRECT_ATT["DEVICE_INFO"], byteorder='big'):
+                    return ie.info[i+3:i+9]
+                i += 3 + int.from_bytes(ie.info[i+1:i+3], byteorder='little')
+        ie = ie.payload
 
-		return None
+    return None
+                        
+
+def get_wps_response_type(packet):
+    ie = packet[Dot11EltVendorSpecific]
+    while isinstance(ie, Dot11EltVendorSpecific):
+        if ie.info[:3] == WPS_OUI and ie.info[3] == int.from_bytes(OUI_TYPE["WPS"], byteorder='big'):
+            i = 4
+            while i < len(ie.info):
+                if ie.info[i:i+2] == WPS_ATT["RESPONSE_TYPE"]:
+                    return ie.info[i+4]
+                i += 4 + int.from_bytes(ie.info[i+2:i+4], byteorder='big')
+        ie = ie.payload
+
+    return None        

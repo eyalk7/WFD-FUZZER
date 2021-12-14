@@ -14,7 +14,7 @@ class Fuzzer():
 		self.iface = iface
 
 
-	def _send_req(self, frame, repeats = 5):
+	def _send_req(self, frame, repeats = 500):
 		"""
 		sends a probe request in a loop until we get a response and returns the response
 		"""
@@ -44,6 +44,14 @@ class Fuzzer():
 		frame = create_asso_req(self.sta_mac, dst_mac, ssid)
 		return self._send_req(frame, repeats=1)
 
+	def send_block_ack_req(self, dst_mac):
+			frame = create_block_ack_req(self.sta_mac, dst_mac)
+			return self._send_req(frame, repeats=1)
+
+	def send_eap(self, dst_mac, phase, id=0):
+		frame = create_eap_packet(dst_mac, self.sta_mac, phase, id)
+		return self._send_req(frame)
+
 	
 	
 	
@@ -66,13 +74,21 @@ if __name__ == "__main__":
 		quit()		
 
 	prov_res = fuzzer.send_prov_disc_req(device_p2p_addr)
-	
-	probe_res = fuzzer.send_probe_req(sink_ssid, "0011000101001000", "0004")
+
+	while True:	
+		probe_res = fuzzer.send_probe_req(sink_ssid, "0011000101001000", "0004")
+		if get_wps_response_type(probe_res) == 2:
+			break
 
 	auth_res = fuzzer.send_auth_req(interface_p2p_addr)
 
 	asso_res = fuzzer.send_asso_req(interface_p2p_addr, sink_ssid)
 
+	# block_ack_res = fuzzer.send_block_ack_req(interface_p2p_addr)
+
+	eap_start_res = fuzzer.send_eap(interface_p2p_addr, "start")
+
+	# eap_id_res = send_eap(interface_p2p_addr, "id")
 	# after this need to add WPS packages
 	
 	
