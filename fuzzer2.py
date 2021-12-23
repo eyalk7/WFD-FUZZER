@@ -98,3 +98,6 @@ class Fuzzer:
         if self.to_fuzz and self.state in self.to_fuzz:
             fuzz(frame)
         response = self._send_req(frame)
+        
+        
+        self.state = State.DONE
