@@ -117,7 +117,8 @@ def wifi_direct_device_info_att(
     device_name_att_type = unhexlify(dev_name_type)
 
     # string
-    device_name = bytes(dev_name, encoding="utf8")
+    # device_name = bytes(dev_name, encoding="utf8")
+    device_name = dev_name
 
     device_name_len = (len(device_name)).to_bytes(2, byteorder="big")
 
@@ -379,7 +380,7 @@ def create_probe_req_cpy(src_mac, type, ssid, dev_name):
     return frame
 
 
-def create_prov_disc_req(src_mac, dst_mac):
+def create_prov_disc_req(src_mac, dst_mac, dev_name):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
@@ -391,7 +392,7 @@ def create_prov_disc_req(src_mac, dst_mac):
     direct_ie_content = wifi_direct_capabilities_att(
         "00100101", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", "FUZZER"
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", dev_name
     )
     direct_ie = direct_ie_header + direct_ie_content
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
