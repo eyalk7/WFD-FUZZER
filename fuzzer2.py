@@ -9,7 +9,7 @@ from enum import Enum
 PHONE_MAC = "00:00:00:00:00:01"
 DIRECT_SSID = "DIRECT-"
 
-class State(Enum):
+class States(Enum):
     PROBE_1 = 1
     PROBE_2 = 2
     PROV = 3
@@ -19,28 +19,34 @@ class State(Enum):
     DONE = 7
 
 PACKET_CREATORS = {
-            State.PROBE_1 : create_probe_req,
-            State.PROBE_2 : create_probe_req,
-            State.PROV : create_prov_disc_req,
-            State.AUTH : create_auth_req,
-            State.ASSO : create_asso_req,
-            State.EAPOL: create_eap_packet
+            States.PROBE_1 : create_probe_req,
+            States.PROBE_2 : create_probe_req,
+            States.PROV : create_prov_disc_req,
+            States.AUTH : create_auth_req,
+            States.ASSO : create_asso_req,
+            States.EAPOL: create_eap_packet
 }
 
 class Fuzzer:
-    def __init__(self, iface, sta_mac=PHONE_MAC, ap_mac=None, to_fuzz=None, packet_creators=PACKET_CREATORS):
+    def __init__(self, iface, sta_mac=PHONE_MAC, packet_creators=PACKET_CREATORS):
         self.sta_mac = sta_mac
-        self.target_ap_mac = ap_mac
         self.iface = iface
+        self.target_ap_mac = None
         self.ssid = None
-        self.state = None
-        self.to_fuzz = to_fuzz
+        self.target_p2p_mac = None
         self.sn = 0
-        self.packet_creators = packet_creators
+        self.packet_creators = {
+            States.PROBE_1 : self.create_probe_req,
+            States.PROBE_2 : self.create_probe_req,
+            States.PROV : self.create_prov_disc_req,
+            States.AUTH : self.create_auth_req,
+            States.ASSO : self.create_asso_req,
+            States.EAPOL: self.create_eap_packet
+}
 
     def _send_req(self, frame, recv=True, repeats=10):
         """
-        sends a probe request in a loop until we get a response and returns the response
+        sends a probe request in a loop until we get a response and return the response
         """
         if recv:
             response = None
@@ -56,48 +62,50 @@ class Fuzzer:
 
         return response
 
-    
-    def random_fuzz(self):
-        #TODO: avoid code duplication of pkt creation and sending
-        self.state = State.PROBE_1
-        frame = self.packet_creators[self.state](self.sta_mac, DIRECT_SSID, "0100001111011000", "0000")
-        if self.to_fuzz and self.state in self.to_fuzz:
-            fuzz(frame)
-        response = self._send_req(frame)
-        device_p2p_addr = get_device_p2p_addr(response)
-        if device_p2p_addr == None:
-            print("unable to read device P2P address from probe response.")
-            quit()
+    def create_probe_req(self):
+        if self.state == States.PROBE_1:
+            config_methods = "0100001111011000"
+            pass_id = "0000"
+        elif self.state == States.PROBE_2:
+            config_methods = "0011000101001000"
+            pass_id = "0004"
+        else:
+            raise ValueError
+        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id)
+        return frame
 
-        self.target_ap_mac = response.addr2
-        self.ssid = response.info
+    def create_prov_disc_req(self):
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac)
+        return frame
 
-        self.state = State.PROV
-        frame = self.packet_creators[self.state](self.sta_mac, device_p2p_addr)
-        if self.to_fuzz and self.state in self.to_fuzz:
-            fuzz(frame)
-        response = self._send_req(frame)
+    def create_auth_req(self):
+        frame = create_auth_req(self.sta_mac, self.target_ap_mac)
+        return frame
 
-        self.state = State.PROBE_2
-        frame = self.packet_creators[self.state](self.sta_mac, self.ssid, "0011000101001000", "0004")
-        if self.to_fuzz and self.state in self.to_fuzz:
-            fuzz(frame)
-        while True:
+    def create_asso_req(self):
+        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid)
+        return frame
+
+    def create_block_ack_req(self):
+        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac)
+        return frame
+
+    def create_eap_packet(self):
+        frame = create_eap_packet(self.sta_mac, self.target_ap_mac, phase="start", id=0)
+        return frame
+
+    def fuzz(self, state_to_fuzz, func):
+        for state in States:
+            frame = self.packet_creators[state]
+            if state == state_to_fuzz:
+                func(frame)
             response = self._send_req(frame)
-            if get_wps_response_type(response) == 2:
-                break
+            if state == States.PROBE_1:
+                self.target_p2p_mac = get_device_p2p_addr(response)
+                self.target_ap_mac = response.addr2
+                self.ssid = response.info
+            elif state == States.PROBE_2:
+                while get_wps_response_type(response) != 2:
+                    response = self._send_req(frame)
 
-        self.state = State.AUTH
-        frame = self.packet_creators[self.state](self.sta_mac, self.target_ap_mac)
-        if self.to_fuzz and self.state in self.to_fuzz:
-            fuzz(frame)
-        response = self._send_req(frame)
-
-        self.state = State.ASSO
-        frame = self.packet_creators[self.state](self.sta_mac, self.target_ap_mac, self.ssid)
-        if self.to_fuzz and self.state in self.to_fuzz:
-            fuzz(frame)
-        response = self._send_req(frame)
-        
-        
-        self.state = State.DONE
+    
