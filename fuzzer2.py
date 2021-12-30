@@ -29,6 +29,7 @@ class Fuzzer:
         self.ssid = None
         self.target_p2p_mac = None
         self.sn = 0
+        self.state = None
         self.packet_creators = {
             States.PROBE_1 : self.create_probe_req,
             States.PROBE_2 : self.create_probe_req,
@@ -96,6 +97,7 @@ class Fuzzer:
     
     def fuzz_it(self):
         for state in States:
+            self.state = state
             frame = self.packet_creators[state]()
             response = self._send_req(frame)
             if state == States.PROBE_1:
