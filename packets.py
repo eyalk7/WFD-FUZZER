@@ -411,21 +411,7 @@ def create_block_ack_req(src_mac, dst_mac):
     return frame
 
 
-<<<<<<< HEAD
 def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
-=======
-def create_block_ack_req_cpy(src_mac, dst_mac):
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("d0003c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "6050")
-    )
-    frame /= Raw(unhexlify("03004d031000000000"))
-
-    return frame
-
-
-def create_eap_packet(src_mac, dst_mac, phase="start", id=0):
->>>>>>> 32a62bfe9a10ba2030715ab2a6134742dcecc387
     frame = RadioTap()
     frame /= Dot11(
         addr1=dst_mac, addr2=src_mac, addr3=dst_mac, type=0x2, subtype=0x8, FCfield=0x1
