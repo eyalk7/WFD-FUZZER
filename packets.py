@@ -117,8 +117,7 @@ def wifi_direct_device_info_att(
     device_name_att_type = unhexlify(dev_name_type)
 
     # string
-    # device_name = bytes(dev_name, encoding="utf8")
-    device_name = dev_name
+    device_name = bytes(dev_name, encoding="utf8")
 
     device_name_len = (len(device_name)).to_bytes(2, byteorder="big")
 
@@ -337,49 +336,6 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id):
     return frame
 
 
-def create_probe_req_cpy(src_mac, type, ssid, dev_name):
-    frame = RadioTap()
-    if type == "first":
-        bin_dev_name = bytes(dev_name, encoding="utf8")
-        frame /= Raw(
-            unhexlify(
-                "40000000ffffffffffff" + mac_addr_to_hex(src_mac) + "ffffffffffffe05e"
-            )
-        )
-        frame /= Raw(
-            unhexlify(
-                "00074449524543542d010c02040b0c121618243048606c03010a2d1a210117ffff0000000000000000000000000000000000000000007f080000080000000040dd"
-                + hexlify(
-                    (141 + len(bin_dev_name)).to_bytes(1, byteorder="big")
-                ).decode("utf-8")
-                + "0050f204104a000110103a0001011008000243d81047001012d78e1bef9359df8437b8dec4e0c31f10540008000a0050f2040005103c0001031002000200001009000200001012000200001021001353414d53554e475f454c454354524f4e4943531023000e53414d53554e475f4d4f42494c4510240004323031341011"
-                + hexlify(len(bin_dev_name).to_bytes(2, byteorder="big")).decode(
-                    "utf-8"
-                )
-                + hexlify(bin_dev_name).decode("utf-8")
-                + "1049000900372a000120030101dd0d506f9a0a00000601101c440032dd1300904c0408bf0c3270800ffaff0000faff0000dd070050f208001100dd09001018020000100000dd11506f9a090202002500060500494c045101"
-            )
-        )
-
-    else:
-        bin_ssid = bytes(ssid, encoding="utf8")
-        frame /= Raw(
-            unhexlify(
-                "40000000ffffffffffff" + mac_addr_to_hex(src_mac) + "ffffffffffff705f"
-            )
-        )
-        frame /= Raw(
-            unhexlify(
-                "00"
-                + hexlify(len(bin_ssid).to_bytes(1, byteorder="big")).decode("utf-8")
-                + hexlify(bin_ssid).decode("utf-8")
-                + "01088c129824b048606c03010b2d1a631117ffff0000000000000000000000000000000000000000007f080000080000000040dd6c0050f204104a000110103a0001011008000231481047001012d78e1bef9359df8437b8dec4e0c31f105400080000000000000000103c00010310020002000010090002000010120002000410210001201023000120102400012010110001201049000900372a000120030101dd0d506f9a0a00000601101c440032dd1300904c0408bf0c3270800ffaff0000faff0000dd070050f208001100dd09001018020000100000dd11506f9a090202002500060500494c045101"
-            )
-        )
-
-    return frame
-
-
 def create_prov_disc_req(src_mac, dst_mac, dev_name):
     # basic headers
     frame = RadioTap()
@@ -409,48 +365,10 @@ def create_prov_disc_req(src_mac, dst_mac, dev_name):
     return frame
 
 
-def create_prov_disc_req_cpy(src_mac, dst_mac, dev_name):
-    bin_dev_name = bytes(dev_name, encoding="utf8")
-
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("d0003c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "605f")
-    )
-    frame /= Raw(
-        unhexlify(
-            "0409506f9a090701dd"
-            + hexlify((33 + len(bin_dev_name)).to_bytes(1, byteorder="little")).decode(
-                "utf-8"
-            )
-            + "506f9a0902020025000d"
-            + hexlify((21 + len(bin_dev_name)).to_bytes(2, byteorder="little")).decode(
-                "utf-8"
-            )
-            + mac_addr_to_hex(src_mac)
-            + "0188000a0050f2040005001011"
-            + hexlify(len(bin_dev_name).to_bytes(2, byteorder="big")).decode("utf-8")
-            + hexlify(bin_dev_name).decode("utf-8")
-            + "dd0a0050f204100800020080dd0d506f9a0a00000601101c440032dd0b0000f00a0000040a31a8c0dd470000f01100004024695f2b650d0ebb2bbf5c211c8d7b95100e3cef03642d351964287f2bb8b4e33a336d162519b0a91c5177dc062e003763296667083e2805e6f68eb7aee56411dd090000f00b04ca1c0000"
-        )
-    )
-
-    return frame
-
-
 def create_auth_req(src_mac, dst_mac):
     frame = RadioTap()
     frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
     frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
-    return frame
-
-
-def create_auth_req_cpy(src_mac, dst_mac):
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("b0003c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "d04f")
-    )
-    frame /= Raw(unhexlify("000001000000dd09001018020000100000"))
-
     return frame
 
 
@@ -482,46 +400,6 @@ def create_asso_req(src_mac, dst_mac, ssid):
     return frame
 
 
-def create_asso_req_cpy(src_mac, dst_mac, ssid, dev_name):
-    bin_ssid = bytes(ssid, encoding="utf8")
-    bin_dev_name = bytes(dev_name, encoding="utf8")
-
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("00003c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "e04f")
-    )
-    frame /= Raw(
-        unhexlify(
-            "31040a0000"
-            + hexlify(len(bin_ssid).to_bytes(1, byteorder="big")).decode("utf-8")
-            + hexlify(bin_ssid).decode("utf-8")
-            + "01088c129824b048606c210202142402010d2d1aad0117ffff000000000000000000000000000000000000000000dd180050f204104a000110103a0001011049000600372a000120dd0d506f9a0a00000601101c440032dd09001018020000100000dd070050f202000100dd"
-            + hexlify((33 + len(bin_dev_name)).to_bytes(1, byteorder="little")).decode(
-                "utf-8"
-            )
-            + "506f9a0902020027000d"
-            + hexlify((21 + len(bin_dev_name)).to_bytes(2, byteorder="little")).decode(
-                "utf-8"
-            )
-            + mac_addr_to_hex(src_mac)
-            + "0188000a0050f2040005001011"
-            + hexlify(len(bin_dev_name).to_bytes(2, byteorder="big")).decode("utf-8")
-            + hexlify(bin_dev_name).decode("utf-8")
-        )
-    )
-
-    return frame
-
-
-def create_null_cpy(src_mac, dst_mac):
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("48012c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "f04f")
-    )
-
-    return frame
-
-
 def create_block_ack_req(src_mac, dst_mac):
     # basic headers
     frame = RadioTap()
@@ -529,16 +407,6 @@ def create_block_ack_req(src_mac, dst_mac):
 
     # fixed parameters
     frame /= Raw(unhexlify("0300d5031000000000"))
-
-    return frame
-
-
-def create_block_ack_req_cpy(src_mac, dst_mac):
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify("d0003c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "6050")
-    )
-    frame /= Raw(unhexlify("03004d031000000000"))
 
     return frame
 
@@ -563,20 +431,17 @@ def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
             eap.len = len(eap)
             frame /= eap
         elif phase == "m1":
-            pass
-
-    return frame
-
-
-def create_eap_start_cpy(src_mac, dst_mac):
-    frame = RadioTap()
-    frame /= Raw(
-        unhexlify(
-            "88013c00" + dst_mac + mac_addr_to_hex(src_mac) + dst_mac + "00000000"
-        )
-    )
-    frame /= Raw(unhexlify("aaaa03000000888e"))
-    frame /= Raw(unhexlify("01010000"))
+            eap = EAP(
+                code=0x2, id=id, type=0xFE, identity="WFA-SimpleConfig-Enrollee-1-0"
+            )
+            eap.len = len(eap)
+            frame /= eap
+        elif phase == "m1":
+            eap = EAP(
+                code=0x2, id=id, type=0xFE, identity="WFA-SimpleConfig-Enrollee-1-0"
+            )
+            eap.len = len(eap)
+            frame /= eap
 
     return frame
 
