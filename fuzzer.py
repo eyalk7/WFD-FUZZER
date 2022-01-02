@@ -4,93 +4,162 @@ import sys
 from scapy.all import *
 from packets import *
 from binascii import hexlify, unhexlify
-from time import sleep
+from enum import Enum
 from random import randbytes
 
 PHONE_MAC = "00:00:00:00:00:01"
 DIRECT_SSID = "DIRECT-"
 
+class States(Enum):
+    PROBE_1 = 1
+    PROV = 2
+    PROBE_2 = 3
+    AUTH_1 = 4
+    ASSO_1 = 5
+    EAPOL = 6
+    EAP_IDEN = 7
+    EAP_M1 = 8
+    EAP_M3 = 9
+    EAP_M5 = 10
+    EAP_M7 = 11
+    EAP_DONE = 12
+    DISASSO = 13
+    AUTH_2 = 14
+    ASSO_2 = 15
+    KEY2 = 16
+    KEY4 = 17
+    DONE = 18
+
 
 class Fuzzer:
-    def __init__(self, iface, sta_mac=PHONE_MAC, ap_mac=None):
+    def __init__(self, iface, sta_mac=PHONE_MAC, target_ap_mac = None):
+        self.device_name = bytes('FUZZER', encoding="utf8")
         self.sta_mac = sta_mac
-        self.ap_mac = ap_mac
         self.iface = iface
+        self.target_ap_mac = target_ap_mac
+        self.ssid = DIRECT_SSID
+        self.target_p2p_mac = None
+        self.sn = 0
+        self.state = None
+        self.packet_creators = {
+            States.PROBE_1 : self.create_probe_req,
+            States.PROV : self.create_prov_disc_req,
+            States.PROBE_2 : self.create_probe_req,            
+            States.AUTH_1 : self.create_auth_req,
+            States.ASSO_1 : self.create_asso_req,
+            States.EAPOL : self.create_eap_start_packet,
+            States.EAP_IDEN : self.create_eap_iden_packet,
+            States.EAP_M1 : self.create_eap_m1_packet,
+            States.EAP_M3 : self.create_eap_m3_packet,
+            States.EAP_M5 : self.create_eap_m5_packet,
+            States.EAP_M7 : self.create_eap_m7_packet,
+            States.EAP_DONE : self.create_eap_done_packet,
+            # States.DISASSO : _
+            # States.AUTH_2 : _
+            # States.ASSO_2 : _
+            # States.KEY2 : _
+            # States.KEY4 : _
+            States.DONE : quit
+            }
 
-    def _send_req(self, frame, repeats=10):
+    def _send_req(self, frame, recv=True, repeats=10):
         """
-        sends a probe request in a loop until we get a response and returns the response
+        sends a probe request in a loop until we get a response and return the response
         """
-        response = None
-        while not response and repeats > 0:
-            repeats -= 1
-            ans, unans = srp(
-                frame, iface=self.iface, inter=0.02, timeout=0.5, verbose=False
-            )
-            if ans:
-                response = ans[0][1]  # list of answers. each answer is a tuple
+        if recv:
+            response = None
+            while not response and repeats > 0:
+                repeats -= 1
+                ans, unans = srp(frame, iface=self.iface, inter=0.02, timeout=0.5)
+                ans.summary()
+                unans.summary()
+                if ans:
+                    response = ans[0][1]  # list of answers. each answer is a tuple
+        else:
+            sendp(frame)
+
         return response
 
-    def send_probe_req(self, ssid, config_methods, pass_id):
-        frame = create_probe_req(self.sta_mac, ssid, config_methods, pass_id)
-        return self._send_req(frame)
+    def create_probe_req(self):
+        if self.state == States.PROBE_1:
+            config_methods = "0100001111011000"
+            pass_id = "0000"
+        elif self.state == States.PROBE_2:
+            config_methods = "0011000101001000"
+            pass_id = "0004"
+        else:
+            raise ValueError
+        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id)
+        return frame
 
-    def send_prov_disc_req(self, dst_mac, dev_name="FUZZER"):
-        frame = create_prov_disc_req(self.sta_mac, dst_mac, dev_name)
-        return self._send_req(frame)
+    def create_prov_disc_req(self):
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name)
+        return frame
 
-    def send_auth_req(self, dst_mac):
-        frame = create_auth_req(self.sta_mac, dst_mac)
-        sendp(frame, iface=self.iface)
+    def create_auth_req(self):
+        frame = create_auth_req(self.sta_mac, self.target_ap_mac)
+        return frame
 
-    def send_asso_req(self, dst_mac, ssid):
-        frame = create_asso_req(self.sta_mac, dst_mac, ssid)
-        sendp(frame, iface=self.iface)
+    def create_asso_req(self):
+        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name)
+        return frame
 
-    def send_block_ack_req(self, dst_mac):
-        frame = create_block_ack_req(self.sta_mac, dst_mac)
-        return self._send_req(frame)
+    def create_block_ack_req(self):
+        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac)
+        return frame
 
-    def send_eap(self, dst_mac, phase, id=0):
-        frame = create_eap_packet(dst_mac, self.sta_mac, phase, id)
-        return self._send_req(frame)
+    def create_eap_start_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="start", id=0)
+        return frame
 
+    def create_eap_iden_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="iden", id=0)
+        return frame
 
-def run_protocol(fuzzer, sink_mac):
-    device_p2p_addr = None
-    interface_p2p_addr = None
-    sink_ssid = None
-    while device_p2p_addr == None:
-        probe_res = fuzzer.send_probe_req(DIRECT_SSID, "0100001111011000", "0000")
+    def create_eap_m1_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m1", id=0)
+        return frame
 
-        if probe_res == None:
-            continue
+    def create_eap_m3_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m3", id=0)
+        return frame
 
-        interface_p2p_addr = probe_res.addr2
-        sink_ssid = probe_res.info
-        device_p2p_addr = get_device_p2p_addr(probe_res)
+    def create_eap_m5_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m5", id=0)
+        return frame
 
-        if device_p2p_addr != unhexlify(sink_mac):
-            print("Found sink ", hexlify(device_p2p_addr))
-            device_p2p_addr = None
+    def create_eap_m7_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m7", id=0)
+        return frame 
 
-    fuzzer.send_prov_disc_req(device_p2p_addr)
+    def create_eap_done_packet(self):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="done", id=0)
+        return frame                               
 
-    while True:
-        probe_res = fuzzer.send_probe_req(sink_ssid, "0011000101001000", "0004")
-        if get_wps_response_type(probe_res) == 2:
-            break
-
-    fuzzer.send_auth_req(interface_p2p_addr)
-
-    fuzzer.send_asso_req(interface_p2p_addr, sink_ssid)
-
-    eap_iden_req = fuzzer.send_eap(interface_p2p_addr, "start")
-
-    print(eap_iden_req)
-
-    fuzzer.send_eap(interface_p2p_addr, "id")
-
+    def fuzz_dev_name(self):
+        device_name = randbytes(15)
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, device_name)
+        return frame
+    
+    def fuzz_it(self):
+        for state in States:
+            self.state = state
+            frame = self.packet_creators[state]()
+            response = self._send_req(frame)
+            if state == States.PROBE_1:
+                while self.target_ap_mac != None and self.target_ap_mac != response.addr2:
+                    # Got wrong device, try again
+                    response = self._send_req(frame)
+                self.target_ap_mac = response.addr2
+                self.target_p2p_mac = get_device_p2p_addr(response)                
+                self.ssid = response.info
+            elif state == States.PROBE_2:
+                while get_wps_response_type(response) != 2:
+                    response = self._send_req(frame)
+                    #TODO: start over if stuck in this loop move than 20 times (it happens because the provision step didn't worked)
+            elif state == States.EAPOL:
+                print(response)
+                quit()
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -98,6 +167,13 @@ if __name__ == "__main__":
         quit()
 
     fuzzer = Fuzzer(sys.argv[1])
+    
+    #TODO: better to show a menu and let user choose type of fuzzing and set it inside the fuzzer
+    # fuzzer.packet_creators[States.PROV] = fuzzer.fuzz_dev_name
+    for i in range(256):
+        fuzzer.fuzz_it()
 
-    # Sink MAC is given here to prevent initiating the protocol with some unknown device
-    run_protocol(fuzzer, sink_mac="82c5f27aa0a3")
+
+
+        
+        
