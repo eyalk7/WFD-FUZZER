@@ -3,7 +3,7 @@
 import sys
 from scapy.all import *
 from packets import *
-from binascii import hexlify, unhexlify
+from utils import *
 from enum import Enum
 from random import randbytes
 
@@ -147,7 +147,7 @@ class Fuzzer:
             frame = self.packet_creators[state]()
             response = self._send_req(frame)
             if state == States.PROBE_1:
-                while self.target_ap_mac != None and self.target_ap_mac != response.addr2:
+                while response == None or (self.target_ap_mac != None and self.target_ap_mac != response.addr2):
                     # Got wrong device, try again
                     response = self._send_req(frame)
                 self.target_ap_mac = response.addr2
@@ -162,18 +162,17 @@ class Fuzzer:
                 quit()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("use: sudo python3 fuzzer.py <INTERFACE_NAME>")
+    if len(sys.argv) < 2:
+        print("use: sudo python3 fuzzer.py <INTERFACE_NAME> <TARGET_AP_MAC:optional>")
         quit()
 
-    fuzzer = Fuzzer(sys.argv[1])
+    target_ap_mac = None
+    if len(sys.argv) == 3:
+        target_ap_mac = sys.argv[2]
+
+    fuzzer = Fuzzer(sys.argv[1], target_ap_mac=target_ap_mac)
     
     #TODO: better to show a menu and let user choose type of fuzzing and set it inside the fuzzer
     # fuzzer.packet_creators[States.PROV] = fuzzer.fuzz_dev_name
     for i in range(256):
         fuzzer.fuzz_it()
-
-
-
-        
-        

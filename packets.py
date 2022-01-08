@@ -1,5 +1,6 @@
 from scapy.all import *
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
+from utils import *
 
 BROADCAST_MAC = "ff:ff:ff:ff:ff:ff"
 WIFI_OUI = unhexlify("506f9a")
@@ -32,14 +33,6 @@ WPS_ATT = {
     "VERSION_2": unhexlify("1049"),
     "RESPONSE_TYPE": unhexlify("103b"),
 }
-
-
-def binary_str_to_bytes(s):
-    return bytes(int(s[i : i + 8], 2) for i in range(0, len(s), 8))
-
-
-def mac_addr_to_hex(addr):
-    return "".join([c if (i + 1) % 3 else "" for i, c in enumerate(addr)])
 
 
 def wifi_direct_ie_header():
