@@ -136,8 +136,8 @@ class Fuzzer:
         frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="done", id=0, **kwargs)
         return frame
     
-    def set_fuzzed_value(self, state, field_name, value):
-        self.packet_creators[state][1].update({field_name: value})
+    def set_fuzzed_value(self, state, new_values):
+        self.packet_creators[state][1].update(new_values)
 
     def fuzz_it(self):
         for state in self.packet_creators.keys():
@@ -172,10 +172,10 @@ if __name__ == "__main__":
     fuzzer = Fuzzer(sys.argv[1], target_ap_mac=target_ap_mac)
     
     #fuzz length of SSID in first probe request (length only, ssid is the same)
-    #fuzzer.set_fuzzed_value(States.PROBE_1, 'ssid_len', 100)
+    #fuzzer.set_fuzzed_value(States.PROBE_1, {'ssid_len': 100})
     
     #fuzz device name in provision request:
-    #fuzzer.set_fuzzed_value(States.PROV, 'device_name', randbytes(15))
+    #fuzzer.set_fuzzed_value(States.PROV, {'device_name': randbytes(15)})
 
     for i in range(256):
         fuzzer.fuzz_it()
