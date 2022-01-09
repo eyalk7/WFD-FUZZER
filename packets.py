@@ -285,12 +285,12 @@ def wps_ver_2_att():
     return WPS_ATT["VERSION_2"] + unhexlify("000900372a000120030101")
 
 
-def create_probe_req(src_mac, ssid, config_methods, pass_id):
+def create_probe_req(src_mac, ssid, config_methods, pass_id, **kwargs):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(addr1=BROADCAST_MAC, addr2=src_mac, addr3=BROADCAST_MAC)
     frame /= Dot11ProbeReq()
-    frame /= Dot11Elt(ID="SSID", info=ssid, len=len(ssid))
+    frame /= Dot11Elt(ID="SSID", info=ssid, len=kwargs.get('ssid_len', len(ssid)))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
 
     wps_ie_header = wifi_wps_ie_header()
@@ -311,10 +311,10 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id):
         + wps_ver_2_att()
     )
     wps_ie = wps_ie_header + wps_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=len(wps_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie_len', len(wps_ie)))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
-    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie_len', len(display_ie)))
 
     direct_ie_header = wifi_direct_ie_header()
     direct_ie_content = (
@@ -322,12 +322,12 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id):
         + wifi_direct_listen_channel_att()
     )
     direct_ie = direct_ie_header + direct_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie_len', len(direct_ie)))
 
     return frame
 
 
-def create_prov_disc_req(src_mac, dst_mac, dev_name):
+def create_prov_disc_req(src_mac, dst_mac, device_name, **kwargs):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
@@ -339,31 +339,31 @@ def create_prov_disc_req(src_mac, dst_mac, dev_name):
     direct_ie_content = wifi_direct_capabilities_att(
         "00100101", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", dev_name
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name
     )
     direct_ie = direct_ie_header + direct_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie', len(direct_ie)))
 
     wps_ie_header = wifi_wps_ie_header()
     # For now fixed on PushButton
     wps_ie_content = wps_config_methods_att("0000000010000000")
     wps_ie = wps_ie_header + wps_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=len(wps_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie', len(wps_ie)))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
-    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie', len(display_ie)))
 
     return frame
 
 
-def create_auth_req(src_mac, dst_mac):
+def create_auth_req(src_mac, dst_mac, **kwargs):
     frame = RadioTap()
     frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
     frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
     return frame
 
 
-def create_asso_req(src_mac, dst_mac, ssid, dev_name):
+def create_asso_req(src_mac, dst_mac, ssid, device_name, **kwargs):
     frame = RadioTap()
     frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
     frame /= Dot11AssoReq(cap=0x3104, listen_interval=0x00A)
@@ -374,24 +374,24 @@ def create_asso_req(src_mac, dst_mac, ssid, dev_name):
     wps_ie_header = wifi_wps_ie_header()
     wps_ie_content = wps_version_att() + wps_req_type_att() + wps_ver_2_att()
     wps_ie = wps_ie_header + wps_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=len(wps_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie', len(wps_ie)))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
-    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=len(display_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie', len(display_ie)))
 
     direct_ie_header = wifi_direct_ie_header()
     direct_ie_content = wifi_direct_capabilities_att(
         "00100111", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", dev_name
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name
     )
     direct_ie = direct_ie_header + direct_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=len(direct_ie))
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie', len(direct_ie)))
 
     return frame
 
 
-def create_block_ack_req(src_mac, dst_mac):
+def create_block_ack_req(src_mac, dst_mac, **kwargs):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
@@ -402,7 +402,7 @@ def create_block_ack_req(src_mac, dst_mac):
     return frame
 
 
-def create_eap_packet(dst_mac, src_mac, phase="start", id=0):
+def create_eap_packet(dst_mac, src_mac, phase="start", id=0, **kwargs):
     frame = RadioTap()
     frame /= Dot11(
         addr1=dst_mac, addr2=src_mac, addr3=dst_mac, type=0x2, subtype=0x8, FCfield=0x1

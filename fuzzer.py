@@ -42,24 +42,24 @@ class Fuzzer:
         self.sn = 0
         self.state = None
         self.packet_creators = {
-            States.PROBE_1 : self.create_probe_req,
-            States.PROV : self.create_prov_disc_req,
-            States.PROBE_2 : self.create_probe_req,            
-            States.AUTH_1 : self.create_auth_req,
-            States.ASSO_1 : self.create_asso_req,
-            States.EAPOL : self.create_eap_start_packet,
-            States.EAP_IDEN : self.create_eap_iden_packet,
-            States.EAP_M1 : self.create_eap_m1_packet,
-            States.EAP_M3 : self.create_eap_m3_packet,
-            States.EAP_M5 : self.create_eap_m5_packet,
-            States.EAP_M7 : self.create_eap_m7_packet,
-            States.EAP_DONE : self.create_eap_done_packet,
+            States.PROBE_1 : (self.create_probe_req, {}),
+            States.PROV : (self.create_prov_disc_req, {"device_name": self.device_name}),
+            States.PROBE_2 : (self.create_probe_req, {}),
+            States.AUTH_1 : (self.create_auth_req, {}),
+            States.ASSO_1 : (self.create_asso_req, {"device_name": self.device_name}),
+            States.EAPOL : (self.create_eap_start_packet, {}),
+            States.EAP_IDEN : (self.create_eap_iden_packet, {}),
+            States.EAP_M1 : (self.create_eap_m1_packet, {}),
+            States.EAP_M3 : (self.create_eap_m3_packet, {}),
+            States.EAP_M5 : (self.create_eap_m5_packet, {}),
+            States.EAP_M7 : (self.create_eap_m7_packet, {}),
+            States.EAP_DONE : (self.create_eap_done_packet,{}),
             # States.DISASSO : _
             # States.AUTH_2 : _
             # States.ASSO_2 : _
             # States.KEY2 : _
             # States.KEY4 : _
-            States.DONE : quit
+            States.DONE : (quit, {})
             }
 
     def _send_req(self, frame, recv=True, repeats=10):
@@ -80,7 +80,7 @@ class Fuzzer:
 
         return response
 
-    def create_probe_req(self):
+    def create_probe_req(self, **kwargs):
         if self.state == States.PROBE_1:
             config_methods = "0100001111011000"
             pass_id = "0000"
@@ -89,62 +89,61 @@ class Fuzzer:
             pass_id = "0004"
         else:
             raise ValueError
-        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id)
+        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id, **kwargs)
         return frame
 
-    def create_prov_disc_req(self):
-        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name)
+    def create_prov_disc_req(self, **kwargs):
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name, **kwargs)
         return frame
 
-    def create_auth_req(self):
-        frame = create_auth_req(self.sta_mac, self.target_ap_mac)
+    def create_auth_req(self, **kwargs):
+        frame = create_auth_req(self.sta_mac, self.target_ap_mac, **kwargs)
         return frame
 
-    def create_asso_req(self):
-        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name)
+    def create_asso_req(self, **kwargs):
+        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name, **kwargs)
         return frame
 
-    def create_block_ack_req(self):
-        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac)
+    def create_block_ack_req(self, **kwargs):
+        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac, **kwargs)
         return frame
 
-    def create_eap_start_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="start", id=0)
+    def create_eap_start_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="start", id=0, **kwargs)
         return frame
 
-    def create_eap_iden_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="iden", id=0)
+    def create_eap_iden_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="iden", id=0, **kwargs)
         return frame
 
-    def create_eap_m1_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m1", id=0)
+    def create_eap_m1_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m1", id=0, **kwargs)
         return frame
 
-    def create_eap_m3_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m3", id=0)
+    def create_eap_m3_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m3", id=0, **kwargs)
         return frame
 
-    def create_eap_m5_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m5", id=0)
+    def create_eap_m5_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m5", id=0, **kwargs)
         return frame
 
-    def create_eap_m7_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m7", id=0)
+    def create_eap_m7_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m7", id=0, **kwargs)
         return frame 
 
-    def create_eap_done_packet(self):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="done", id=0)
-        return frame                               
-
-    def fuzz_dev_name(self):
-        device_name = randbytes(15)
-        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, device_name)
+    def create_eap_done_packet(self, **kwargs):
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="done", id=0, **kwargs)
         return frame
     
+    def set_fuzzed_value(self, state, field_name, value):
+        self.packet_creators[state][1].update({field_name: value})
+
     def fuzz_it(self):
-        for state in States:
+        for state in self.packet_creators.keys():
             self.state = state
-            frame = self.packet_creators[state]()
+            func, kwargs = self.packet_creators[state]
+            frame = func(**kwargs)
             response = self._send_req(frame)
             if state == States.PROBE_1:
                 while response == None or (self.target_ap_mac != None and self.target_ap_mac != response.addr2):
@@ -172,7 +171,11 @@ if __name__ == "__main__":
 
     fuzzer = Fuzzer(sys.argv[1], target_ap_mac=target_ap_mac)
     
-    #TODO: better to show a menu and let user choose type of fuzzing and set it inside the fuzzer
-    # fuzzer.packet_creators[States.PROV] = fuzzer.fuzz_dev_name
+    #fuzz length of SSID in first probe request (length only, ssid is the same)
+    #fuzzer.set_fuzzed_value(States.PROBE_1, 'ssid_len', 100)
+    
+    #fuzz device name in provision request:
+    #fuzzer.set_fuzzed_value(States.PROV, 'device_name', randbytes(15))
+
     for i in range(256):
         fuzzer.fuzz_it()
