@@ -285,10 +285,10 @@ def wps_ver_2_att():
     return WPS_ATT["VERSION_2"] + unhexlify("000900372a000120030101")
 
 
-def create_probe_req(src_mac, ssid, config_methods, pass_id, **kwargs):
+def create_probe_req(src_mac, ssid, config_methods, pass_id, seq_num, **kwargs):
     # basic headers
     frame = RadioTap()
-    frame /= Dot11(addr1=BROADCAST_MAC, addr2=src_mac, addr3=BROADCAST_MAC)
+    frame /= Dot11(addr1=BROADCAST_MAC, addr2=src_mac, addr3=BROADCAST_MAC, SC=seq_num)
     frame /= Dot11ProbeReq()
     frame /= Dot11Elt(ID="SSID", info=ssid, len=kwargs.get('ssid_len', len(ssid)))
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
@@ -327,10 +327,10 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id, **kwargs):
     return frame
 
 
-def create_prov_disc_req(src_mac, dst_mac, device_name, **kwargs):
+def create_prov_disc_req(src_mac, dst_mac, device_name, seq_num, **kwargs):
     # basic headers
     frame = RadioTap()
-    frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+    frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
 
     # fixed parameters
     frame /= Raw(unhexlify("0409506f9a090701"))
@@ -356,16 +356,16 @@ def create_prov_disc_req(src_mac, dst_mac, device_name, **kwargs):
     return frame
 
 
-def create_auth_req(src_mac, dst_mac, **kwargs):
+def create_auth_req(src_mac, dst_mac, seq_num, **kwargs):
     frame = RadioTap()
-    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
     frame /= Dot11Auth(algo=0, seqnum=0x0001, status=0x0000)
     return frame
 
 
-def create_asso_req(src_mac, dst_mac, ssid, device_name, **kwargs):
+def create_asso_req(src_mac, dst_mac, ssid, device_name, seq_num, **kwargs):
     frame = RadioTap()
-    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+    frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
     frame /= Dot11AssoReq(cap=0x3104, listen_interval=0x00A)
     frame /= Dot11Elt(ID=0, info=ssid)
     frame /= Dot11EltRates(rates=[0x8C, 0x12, 0x98, 0x24, 0xB0, 0x48, 0x60, 0x6C])
@@ -391,10 +391,10 @@ def create_asso_req(src_mac, dst_mac, ssid, device_name, **kwargs):
     return frame
 
 
-def create_block_ack_req(src_mac, dst_mac, **kwargs):
+def create_block_ack_req(src_mac, dst_mac, seq_num, **kwargs):
     # basic headers
     frame = RadioTap()
-    frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac)
+    frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
 
     # fixed parameters
     frame /= Raw(unhexlify("0300d5031000000000"))
@@ -402,10 +402,10 @@ def create_block_ack_req(src_mac, dst_mac, **kwargs):
     return frame
 
 
-def create_eap_packet(dst_mac, src_mac, phase="start", id=0, **kwargs):
+def create_eap_packet(dst_mac, src_mac, seq_num, phase="start", id=0, **kwargs):
     frame = RadioTap()
     frame /= Dot11(
-        addr1=dst_mac, addr2=src_mac, addr3=dst_mac, type=0x2, subtype=0x8, FCfield=0x1
+        addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num, type=0x2, subtype=0x8, FCfield=0x1
     )
     frame /= Dot11QoS()
     frame /= LLC(dsap=0xAA, ssap=0xAA, ctrl=3)

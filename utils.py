@@ -9,6 +9,8 @@ def binary_str_to_bytes(s):
 def mac_addr_to_hex(addr):
     return "".join([c if (i + 1) % 3 else "" for i, c in enumerate(addr)])
 
+def create_seq_num(seq):
+    return seq << 4
 
 def create_string_ascii():
     return bytearray(''.join(choice(ascii_letters) for _ in range(randrange(1,256))), 'utf-8')

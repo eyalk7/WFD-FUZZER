@@ -32,7 +32,7 @@ class States(Enum):
 
 
 class Fuzzer:
-    def __init__(self, iface, sta_mac=PHONE_MAC, target_ap_mac = None):
+    def __init__(self, iface, sta_mac=PHONE_MAC, target_ap_mac = None, starting_seq_num = 1001):
         self.device_name = bytes('FUZZER', encoding="utf8")
         self.sta_mac = sta_mac
         self.iface = iface
@@ -41,6 +41,7 @@ class Fuzzer:
         self.target_p2p_mac = None
         self.sn = 0
         self.state = None
+        self.seq_num = starting_seq_num
         self.packet_creators = {
             States.PROBE_1 : (self.create_probe_req, {}),
             States.PROV : (self.create_prov_disc_req, {"device_name": self.device_name}),
@@ -89,51 +90,51 @@ class Fuzzer:
             pass_id = "0004"
         else:
             raise ValueError
-        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id, **kwargs)
+        frame = create_probe_req(self.sta_mac, self.ssid, config_methods, pass_id, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_prov_disc_req(self, **kwargs):
-        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name, **kwargs)
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_auth_req(self, **kwargs):
-        frame = create_auth_req(self.sta_mac, self.target_ap_mac, **kwargs)
+        frame = create_auth_req(self.sta_mac, self.target_ap_mac, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_asso_req(self, **kwargs):
-        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name, **kwargs)
+        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_block_ack_req(self, **kwargs):
-        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac, **kwargs)
+        frame = create_block_ack_req(self.sta_mac, self.target_ap_mac, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_eap_start_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="start", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="start", id=0, **kwargs)
         return frame
 
     def create_eap_iden_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="iden", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="iden", id=0, **kwargs)
         return frame
 
     def create_eap_m1_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m1", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="m1", id=0, **kwargs)
         return frame
 
     def create_eap_m3_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m3", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="m3", id=0, **kwargs)
         return frame
 
     def create_eap_m5_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m5", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="m5", id=0, **kwargs)
         return frame
 
     def create_eap_m7_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="m7", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="m7", id=0, **kwargs)
         return frame 
 
     def create_eap_done_packet(self, **kwargs):
-        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, phase="done", id=0, **kwargs)
+        frame = create_eap_packet(self.target_ap_mac, self.sta_mac, create_seq_num(self.seq_num), phase="done", id=0, **kwargs)
         return frame
     
     def set_fuzzed_value(self, state, new_values):
@@ -141,6 +142,7 @@ class Fuzzer:
 
     def fuzz_it(self):
         for state in self.packet_creators.keys():
+            print("starting state: ", state)
             self.state = state
             func, kwargs = self.packet_creators[state]
             frame = func(**kwargs)
@@ -159,6 +161,7 @@ class Fuzzer:
             elif state == States.EAPOL:
                 print(response)
                 quit()
+            self.seq_num += 1
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
