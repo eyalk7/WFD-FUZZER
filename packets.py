@@ -327,7 +327,7 @@ def create_probe_req(src_mac, ssid, config_methods, pass_id, seq_num, **kwargs):
     return frame
 
 
-def create_prov_disc_req(src_mac, dst_mac, device_name, seq_num, **kwargs):
+def create_prov_disc_req(src_mac, dst_mac, seq_num, device_name="FUZZER", **kwargs):
     # basic headers
     frame = RadioTap()
     frame /= Dot11(subtype=13, addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
@@ -363,7 +363,7 @@ def create_auth_req(src_mac, dst_mac, seq_num, **kwargs):
     return frame
 
 
-def create_asso_req(src_mac, dst_mac, ssid, device_name, seq_num, **kwargs):
+def create_asso_req(src_mac, dst_mac, ssid, seq_num, device_name="FUZZER", **kwargs):
     frame = RadioTap()
     frame /= Dot11(addr1=dst_mac, addr2=src_mac, addr3=dst_mac, SC=seq_num)
     frame /= Dot11AssoReq(cap=0x3104, listen_interval=0x00A)

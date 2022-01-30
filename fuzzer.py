@@ -94,7 +94,7 @@ class Fuzzer:
         return frame
 
     def create_prov_disc_req(self, **kwargs):
-        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, self.device_name, create_seq_num(self.seq_num), **kwargs)
+        frame = create_prov_disc_req(self.sta_mac, self.target_p2p_mac, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_auth_req(self, **kwargs):
@@ -102,7 +102,7 @@ class Fuzzer:
         return frame
 
     def create_asso_req(self, **kwargs):
-        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, self.device_name, create_seq_num(self.seq_num), **kwargs)
+        frame = create_asso_req(self.sta_mac, self.target_ap_mac, self.ssid, create_seq_num(self.seq_num), **kwargs)
         return frame
 
     def create_block_ack_req(self, **kwargs):
