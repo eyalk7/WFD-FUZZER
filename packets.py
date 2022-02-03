@@ -342,16 +342,16 @@ def create_prov_disc_req(src_mac, dst_mac, seq_num, device_name="FUZZER", **kwar
         src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name
     )
     direct_ie = direct_ie_header + direct_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie', len(direct_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie_len', len(direct_ie)))
 
     wps_ie_header = wifi_wps_ie_header()
     # For now fixed on PushButton
     wps_ie_content = wps_config_methods_att("0000000010000000")
     wps_ie = wps_ie_header + wps_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie', len(wps_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie_len', len(wps_ie)))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
-    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie', len(display_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie_len', len(display_ie)))
 
     return frame
 
@@ -374,10 +374,10 @@ def create_asso_req(src_mac, dst_mac, ssid, seq_num, device_name="FUZZER", **kwa
     wps_ie_header = wifi_wps_ie_header()
     wps_ie_content = wps_version_att() + wps_req_type_att() + wps_ver_2_att()
     wps_ie = wps_ie_header + wps_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie', len(wps_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(wps_ie), len=kwargs.get('wps_ie_len', len(wps_ie)))
 
     display_ie = wifi_display_ie("0000000100010000", 7236, 50)
-    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie', len(display_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(display_ie), len=kwargs.get('display_ie_len', len(display_ie)))
 
     direct_ie_header = wifi_direct_ie_header()
     direct_ie_content = wifi_direct_capabilities_att(
@@ -386,9 +386,9 @@ def create_asso_req(src_mac, dst_mac, ssid, seq_num, device_name="FUZZER", **kwa
         src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name
     )
     direct_ie = direct_ie_header + direct_ie_content
-    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie', len(direct_ie)))
+    frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie_len', len(direct_ie)))
 
-    return frame
+    return frame 
 
 
 def create_block_ack_req(src_mac, dst_mac, seq_num, **kwargs):
