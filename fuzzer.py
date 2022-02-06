@@ -178,7 +178,7 @@ if __name__ == "__main__":
     #fuzzer.set_fuzzed_value(States.PROBE_1, {'ssid_len': 100})
     
     #fuzz device name in provision request:
-    #fuzzer.set_fuzzed_value(States.PROV, {'device_name': randbytes(15)})
+    fuzzer.set_fuzzed_value(States.PROV, {'device_name': bytes('F', encoding="utf8"), 'dev_name_len': 20})
 
     for i in range(256):
         fuzzer.fuzz_it()
