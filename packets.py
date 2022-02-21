@@ -82,6 +82,7 @@ def wifi_direct_device_info_att(
     num_sec_dev_types,
     dev_name_type,
     dev_name,
+    dev_name_len = None
 ):
     # MAC address.
     # can be the same as source addr or different (Wifi Direct gives
@@ -110,16 +111,25 @@ def wifi_direct_device_info_att(
     device_name_att_type = unhexlify(dev_name_type)
 
     # dev name is bytes
+    # dev_name_len is used for fuzzing purposes. We can set this parameter 
+    # to larger value than the actual size of the device name to try to 
+    # leak information from outside the buffer
     device_name_len = (len(dev_name)).to_bytes(2, byteorder="big")
+    if dev_name_len:
+        device_name_len = (dev_name_len).to_bytes(2, byteorder="big")
 
     content = p2p_device_addr + config_methods + primary_device_type_category
     content += primary_device_type_oui + primary_device_type_subcategory
     content += number_of_secondary_device_types + device_name_att_type
     content += device_name_len + dev_name
 
+    total_len = len(content)
+    if dev_name_len:
+        total_len += dev_name_len - len(dev_name)
+
     return (
         DIRECT_ATT["DEVICE_INFO"]
-        + len(content).to_bytes(2, byteorder="little")
+        + total_len.to_bytes(2, byteorder="little")
         + content
     )
 
@@ -348,9 +358,13 @@ def create_prov_disc_req(src_mac, dst_mac, seq_num, device_name="FUZZER", **kwar
     direct_ie_content = wifi_direct_capabilities_att(
         "00100101", "00000000"
     ) + wifi_direct_device_info_att(
-        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name
+        src_mac, "0000000110001000", "000a", "0050f204", "0005", "00", "1011", device_name, kwargs.get('dev_name_len', None)
     )
     direct_ie = direct_ie_header + direct_ie_content
+
+    if 'dev_name_len' in kwargs:
+        kwargs['direct_ie_len'] = len(direct_ie) + kwargs['dev_name_len'] - len(device_name)
+
     frame /= Dot11Elt(ID=221, info=RawVal(direct_ie), len=kwargs.get('direct_ie_len', len(direct_ie)))
 
     return frame
