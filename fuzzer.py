@@ -140,7 +140,6 @@ class Fuzzer:
     def set_fuzzed_value(self, state, new_values):
         self.packet_creators[state][1].update(new_values)
 
-    
     def fuzz_it(self):
         for state in self.packet_creators.keys():
             print("starting state: ", state)
@@ -193,5 +192,8 @@ if __name__ == "__main__":
     #fuzz length of SSID in first probe request (length only, ssid is the same)
     #fuzzer.set_fuzzed_value(States.PROBE_1, {'ssid_len': 100})
     
-    #fuzz device name in provision request:
-    fuzzer.fuzz_length(States.PROV, "dev_name_len", 10)
+    #fuzz device name length in provision request:
+    # fuzzer.fuzz_length(States.PROV, "dev_name_len", 10)
+
+    fuzzer.fuzz_it()
+
