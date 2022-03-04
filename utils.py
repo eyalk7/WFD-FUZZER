@@ -37,3 +37,16 @@ def create_string_specialchar():
 
 def create_string_format():    
     return create_string_inject_pattern(b'\x25'+choice([b'\x70',b'\x64',b'\x63',b'\x75',b'\x78',b'\x73',b'\x6e']))
+
+def mac_iterator(starting_value=1, max_iterations=64):
+    """
+    create an iterator of mac addresses. 
+    starting value is a number represnting a mac address. 1 is 00:00:00:00:00:01 and so on.
+
+    we create an iterator and not a list in case we want to run over a lot of macs
+    """
+    for i in range(starting_value, starting_value + max_iterations):
+        mac_int = i
+        mac_hex = "{:012x}".format(mac_int)
+        mac_str = ":".join(mac_hex[j:j+2] for j in range(0, len(mac_hex), 2))
+        yield mac_str

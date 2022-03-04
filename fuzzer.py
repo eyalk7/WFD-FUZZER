@@ -65,7 +65,7 @@ class Fuzzer:
 
     def _send_req(self, frame, recv=True, repeats=10):
         """
-        sends a probe request in a loop until we get a response and return the response
+        sends a request in a loop until we get a response or we iterate a number equal to repeats and return the response
         """
         if recv:
             response = None
@@ -140,6 +140,7 @@ class Fuzzer:
     def set_fuzzed_value(self, state, new_values):
         self.packet_creators[state][1].update(new_values)
 
+    
     def fuzz_it(self):
         for state in self.packet_creators.keys():
             print("starting state: ", state)
@@ -163,6 +164,23 @@ class Fuzzer:
                 quit()
             self.seq_num += 1
 
+        
+    def fuzz_length(self, state, field, starting_length, iterations=10, step=1):  
+        macs = mac_iterator(max_iterations=iterations)
+        while iterations:
+            fuzzer.sta_mac = next(macs)
+            fuzzer.set_fuzzed_value(state, {field: starting_length})
+            fuzzer.fuzz_it()
+            starting_length += step
+            iterations -= 1
+
+    def run_default(self):
+        macs = mac_iterator()
+        for mac in macs:
+            fuzzer.sta_mac = mac
+            fuzzer.fuzz_it()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("use: sudo python3 fuzzer.py <INTERFACE_NAME> <TARGET_AP_MAC:optional>")
@@ -180,5 +198,4 @@ if __name__ == "__main__":
     #fuzz device name in provision request:
     #fuzzer.set_fuzzed_value(States.PROV, {'device_name': randbytes(15)})
 
-    for i in range(256):
-        fuzzer.fuzz_it()
+    fuzzer.run_default()
