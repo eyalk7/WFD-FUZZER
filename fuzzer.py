@@ -154,6 +154,8 @@ class Fuzzer:
                     # Got wrong device, try again
                     response = self._send_req(frame)
                     reps -= 1
+                if response == None:
+                    break
                 self.target_ap_mac = response.addr2
                 self.target_p2p_mac = get_device_p2p_addr(response)                
                 self.ssid = response.info
@@ -165,6 +167,7 @@ class Fuzzer:
                 print(response)
                 quit()
             self.seq_num += 1
+        self.seq_num = 1
 
         
     def fuzz_length(self, state, field, starting_length, iterations=10, step=1):  
