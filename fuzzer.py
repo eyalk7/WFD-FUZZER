@@ -149,16 +149,18 @@ class Fuzzer:
             frame = func(**kwargs)
             response = self._send_req(frame)
             if state == States.PROBE_1:
-                while response == None or (self.target_ap_mac != None and self.target_ap_mac != response.addr2):
+                reps = 10
+                while reps and (response == None or (self.target_ap_mac != None and self.target_ap_mac != response.addr2)):
                     # Got wrong device, try again
                     response = self._send_req(frame)
+                    reps -= 1
                 self.target_ap_mac = response.addr2
                 self.target_p2p_mac = get_device_p2p_addr(response)                
                 self.ssid = response.info
             elif state == States.PROBE_2:
-                while get_wps_response_type(response) != 2:
+                reps = 10
+                while reps and get_wps_response_type(response) != 2:
                     response = self._send_req(frame)
-                    #TODO: start over if stuck in this loop move than 20 times (it happens because the provision step didn't worked)
             elif state == States.EAPOL:
                 print(response)
                 quit()
@@ -173,13 +175,6 @@ class Fuzzer:
             fuzzer.fuzz_it()
             starting_length += step
             iterations -= 1
-
-    def run_default(self):
-        macs = mac_iterator()
-        for mac in macs:
-            fuzzer.sta_mac = mac
-            fuzzer.fuzz_it()
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -196,6 +191,4 @@ if __name__ == "__main__":
     #fuzzer.set_fuzzed_value(States.PROBE_1, {'ssid_len': 100})
     
     #fuzz device name in provision request:
-    fuzzer.set_fuzzed_value(States.PROV, {'device_name': bytes('F', encoding="utf8"), 'dev_name_len': 20})
-
-    fuzzer.run_default()
+    fuzzer.fuzz_length(States.PROV, "dev_name_len", 10)
