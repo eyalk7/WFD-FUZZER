@@ -149,7 +149,7 @@ class Fuzzer:
             frame = func(**kwargs)
             response = self._send_req(frame)
             if state == States.PROBE_1:
-                reps = 10
+                reps = 1
                 while reps and (response == None or (self.target_ap_mac != None and self.target_ap_mac != response.addr2)):
                     # Got wrong device, try again
                     response = self._send_req(frame)
